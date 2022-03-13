@@ -60,42 +60,57 @@ def convert_annotation_json_to_dataframe(annotation_json_file_path):
     logging.debug('Number of images:', nr_images)
 
     """
-    Extract Super Categories Information
+    Extract Categories and Images Information into dictionary object
     """
-    # Super Category Dictionary Format {'category id': 'category name'}
-    super_categories_dict = {}
+    # Category Dictionary Format {'category id': 'category name'}
+    categories_dict = {}
 
-    for super_categories in categories_info_arr:
-        super_categories_dict[super_categories['id']] = super_categories['supercategory']
+    for category in categories_info_arr:
+        categories_dict[category['id']] = category['name']
 
-    logging.info("Number of categories: %s ; Categories: [%s]" % (nr_cats, super_categories_dict))
+    logging.info("Number of Categories: %s ; Categories: [%s]" % (nr_cats, categories_dict))
+
+    # Image Dictionary Format {'image_id': 'file_name'}
+    image_dict = {}
+
+    for image in images_arr:
+        image_dict[image['id']] = image['file_name']
+
+    logging.info("Number of images: %s ; Images: [%s]" % (nr_images, image_dict))
 
     """
-        Extract Images Information and its relationship with categories
+        Extract Images/Category/Annotations Information and construct final dataframe
+        Final Images Dataframe Format Required:  {'annotation_id', 'image_id', 'category_id','file_name','category_name'}
     """
-    # Images Dataframe Format {'image id','file names','category id','category name'}
-    annotations_dict = {}
-    for annotation in annotations_arr:
-        annotations_dict[annotation['image_id']] = annotation['category_id']
 
-    logging.info("Number of Annotations: %s ; Annotations Data: [%s]" % (nr_annotations, annotations_dict))
+    # Extract required columns from annotations dataset
+    final_info_df = pd.DataFrame(dataset['annotations'])[['id', 'image_id', 'category_id']]
+    final_info_df.rename(columns={'id': 'annotation_id'}, inplace=True)
 
-    # Annotations Dataframe Format {'image id',''category id'}
-    image_info_df = pd.DataFrame(dataset['images'])[['id', 'file_name']]
+    logging.debug("Final_info_df Data: %s " % (final_info_df.head()))
 
     # Extract image and category relationship from annotations
-    for index, row in image_info_df.iterrows():
-        category_id = annotations_dict.get(row['id'])
-        image_info_df.at[index, ['supercategory_name', 'supercategory_id']] = (
-            super_categories_dict.get(category_id), category_id)
+    for index, row in final_info_df.iterrows():
+        final_info_df.at[index, ['file_name', 'category_name']] = (
+            image_dict.get(row['image_id']), categories_dict.get(row['category_id']))
 
     # Drop and rows containing NAN values and convert category id column to Integer
-    image_info_df = image_info_df.dropna()
-    image_info_df['supercategory_id'] = image_info_df['supercategory_id'].astype(int)
-    logging.info(image_info_df.info())
-    logging.info(image_info_df.head())
+    final_info_df = final_info_df.dropna()
+    final_info_df['category_id'] = final_info_df['category_id'].astype(int)
+    logging.info("Final Dataframe Rows: %s " % (final_info_df.head(10)))
+    logging.info(final_info_df.info())
 
-    return image_info_df, super_categories_dict
+    '''Filter dataframe where image ids/category ids are repeated in the row.
+        e.g. if an image contains 3 same category plastic bottle, it will have 3 entries in annotations.json
+        For our classification problem, we want to keep just 1 of the rows.
+        If you are using this code for object detection or segmentation, than remove following line and include
+        more annotation columns to consider bounded box details. 
+    '''
+    filtered_df = final_info_df.drop_duplicates(subset=['image_id', 'category_id'], keep='first')
+
+    logging.info("Final filtered Dataframe Rows: %s " % (filtered_df.head(10)))
+    logging.info(filtered_df.info())
+    return filtered_df, categories_dict
 
 
 def create_folder(split_data_path, data_class_list):
@@ -117,6 +132,7 @@ def move_files_to_other_labelled_folder(source_path, destination_path, image_dat
     This function creates folders in the desired format
     :param source_path: Directory containing images without labelled folders
     :param image_dataframe: Dataframe with all information on images
+        {'annotation_id', 'image_id', 'category_id','file_name','category_name'}
     :param destination_path: Destination with labelled subdirectories
     :return:
     """
@@ -124,19 +140,19 @@ def move_files_to_other_labelled_folder(source_path, destination_path, image_dat
     count = 0
     for index, row in image_dataframe.iterrows():
         # Retrieve category name of image
-        category_name = row['supercategory_name']
+        category_name = row['category_name']
         # Retrieve file name of image
         file_name = str(row['file_name'])
 
         source_filepath = dir_root + os.sep + source_path + os.sep + file_name
         destination_filepath = dir_root + os.sep + destination_path + os.sep + category_name + os.sep + \
-                               file_name.replace('/', '_')
+                               file_name.split('/')[1]
 
         logging.debug(source_filepath)
         logging.debug(destination_filepath)
         try:
             shutil.copyfile(source_filepath, destination_filepath)
-            logging.info(f'{count}. destination_filepath:{destination_filepath}')
+            logging.debug(f'{count}. destination_filepath:{destination_filepath}')
             count = count + 1
         except Exception as e:
             logging.error(f'{sys.exc_info()[0]} occurred: {source_filepath}', exc_info=True)
