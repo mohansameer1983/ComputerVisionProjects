@@ -146,7 +146,7 @@ def move_files_to_other_labelled_folder(source_path, destination_path, image_dat
 
         source_filepath = dir_root + os.sep + source_path + os.sep + file_name
         destination_filepath = dir_root + os.sep + destination_path + os.sep + category_name + os.sep + \
-                               file_name.split('/')[1]
+                               file_name.replace('/', '_')
 
         logging.debug(source_filepath)
         logging.debug(destination_filepath)
@@ -158,6 +158,9 @@ def move_files_to_other_labelled_folder(source_path, destination_path, image_dat
             logging.error(f'{sys.exc_info()[0]} occurred: {source_filepath}', exc_info=True)
 
     logging.info(f'Count:{count}')
+
+    # Optional step to save data to csv file
+    image_dataframe.to_csv(dir_root + os.sep + destination_path + os.sep + 'final_image_data.csv', sep='\t')
     return
 
 
