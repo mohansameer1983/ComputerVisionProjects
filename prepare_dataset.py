@@ -110,10 +110,40 @@ def convert_annotation_json_to_dataframe(annotation_json_file_path):
 
     logging.info("Final filtered Dataframe Rows: %s " % (filtered_df.head(10)))
     logging.info(filtered_df.info())
-    return filtered_df, categories_dict
+
+    '''
+    Converting dataframe to format: {image_name : [list of category labels]}. e.g.
+    batch_1/000012.jpg              [Glass bottle, Other plastic wrapper]
+    batch_1/000013.jpg                                     [Glass bottle]
+    batch_1/000014.jpg  [Styrofoam piece, Drink can, Plastic film, Oth...
+    batch_1/000015.jpg                       [Plastic film, Crisp packet]
+    
+    This is helpful to get process data into form which can be used for multi-label classification
+    '''
+    grouped_image_df = filtered_df.groupby('file_name')['category_name'].apply(list).reset_index(name='labels')
+    logging.info("Final grouped Dataframe Rows: %s " % (grouped_image_df.head(25)))
+    logging.info(grouped_image_df.info())
+
+    # Optional step to save data to csv file
+    save_dataframe_to_csv(filtered_df, 'data/filtered_image_data.csv')
+    save_dataframe_to_csv(grouped_image_df, 'data/grouped_image_data.csv')
+
+    return filtered_df, grouped_image_df, categories_dict
 
 
-def create_folder(split_data_path, data_class_list):
+def create_folder(folder_data_path):
+    """
+    This function creates normal folder
+    :param folder_data_path:
+    :return:
+    """
+    dir_root = os.getcwd()
+    dir_target = os.path.join(dir_root, folder_data_path)
+    Path(dir_target).mkdir(parents=True, exist_ok=True)
+    return
+
+
+def create_split_folder(split_data_path, data_class_list):
     """
     This function creates folders in the desired format
     :param data_class_list: these are the categories inside dataset
@@ -127,13 +157,14 @@ def create_folder(split_data_path, data_class_list):
     return
 
 
-def move_files_to_other_labelled_folder(source_path, destination_path, image_dataframe):
+def move_files_to_other_labelled_folder(source_path, destination_path, image_dataframe, split_into_category=False):
     """
     This function creates folders in the desired format
     :param source_path: Directory containing images without labelled folders
     :param image_dataframe: Dataframe with all information on images
         {'annotation_id', 'image_id', 'category_id','file_name','category_name'}
     :param destination_path: Destination with labelled subdirectories
+    :param split_into_category: boolean value to indicate if files needed to be moved as per categories
     :return:
     """
     dir_root = os.getcwd()
@@ -145,8 +176,13 @@ def move_files_to_other_labelled_folder(source_path, destination_path, image_dat
         file_name = str(row['file_name'])
 
         source_filepath = dir_root + os.sep + source_path + os.sep + file_name
-        destination_filepath = dir_root + os.sep + destination_path + os.sep + category_name + os.sep + \
-                               file_name.replace('/', '_')
+
+        if not split_into_category:
+            destination_filepath = dir_root + os.sep + destination_path + os.sep + \
+                                   file_name.replace('/', '_')
+        else:
+            destination_filepath = dir_root + os.sep + destination_path + os.sep + category_name + os.sep + \
+                                   file_name.replace('/', '_')
 
         logging.debug(source_filepath)
         logging.debug(destination_filepath)
@@ -159,20 +195,32 @@ def move_files_to_other_labelled_folder(source_path, destination_path, image_dat
 
     logging.info(f'Count:{count}')
 
-    # Optional step to save data to csv file
-    image_dataframe.to_csv(dir_root + os.sep + destination_path + os.sep + 'final_image_data.csv', sep='\t')
+    return
+
+
+def save_dataframe_to_csv(dataframe, file_path):
+    dir_root = os.getcwd()
+    dataframe.to_csv(dir_root + os.sep + file_path, sep='\t')
     return
 
 
 def main():
     dataset_path = 'data'
     anns_file_path = dataset_path + os.sep + 'annotations.json'
+    train_images_path = dataset_path + os.sep + 'train'
+    test_images_path = dataset_path + os.sep + 'test'
     split_data_path = dataset_path + os.sep + 'split'
-    source_images_path = dataset_path + os.sep + 'orig'
+    train_preprocessed_data_path = dataset_path + os.sep + 'train_preprocessed'
+    test_preprocessed_data_path = dataset_path + os.sep + 'test_preprocessed'
 
-    image_dataframe, labels_dict = convert_annotation_json_to_dataframe(anns_file_path)
-    create_folder(split_data_path, labels_dict.values())
-    move_files_to_other_labelled_folder(source_images_path, split_data_path, image_dataframe)
+    image_dataframe, grouped_image_dataframe, labels_dict = convert_annotation_json_to_dataframe(anns_file_path)
+    create_folder(train_preprocessed_data_path)
+    create_folder(test_preprocessed_data_path)
+    #create_split_folder(split_data_path, labels_dict.values())
+    move_files_to_other_labelled_folder(train_images_path, train_preprocessed_data_path, image_dataframe, False)
+    move_files_to_other_labelled_folder(test_images_path, test_preprocessed_data_path, image_dataframe, False)
+
+    return
 
 
 if __name__ == "__main__":
