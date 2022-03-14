@@ -124,10 +124,6 @@ def convert_annotation_json_to_dataframe(annotation_json_file_path):
     logging.info("Final grouped Dataframe Rows: %s " % (grouped_image_df.head(25)))
     logging.info(grouped_image_df.info())
 
-    # Optional step to save data to csv file
-    save_dataframe_to_csv(filtered_df, 'data/filtered_image_data.csv')
-    save_dataframe_to_csv(grouped_image_df, 'data/grouped_image_data.csv')
-
     return filtered_df, grouped_image_df, categories_dict
 
 
@@ -214,6 +210,9 @@ def main():
     test_preprocessed_data_path = dataset_path + os.sep + 'test_preprocessed'
 
     image_dataframe, grouped_image_dataframe, labels_dict = convert_annotation_json_to_dataframe(anns_file_path)
+    # Optional step to save data to csv file
+    save_dataframe_to_csv(image_dataframe, 'data/filtered_image_data.csv')
+    save_dataframe_to_csv(grouped_image_dataframe, 'data/grouped_image_data.csv')
     create_folder(train_preprocessed_data_path)
     create_folder(test_preprocessed_data_path)
     #create_split_folder(split_data_path, labels_dict.values())
