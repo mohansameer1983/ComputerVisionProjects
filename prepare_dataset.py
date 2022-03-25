@@ -32,6 +32,8 @@ import numpy as np
 
 import logging
 
+from distutils.dir_util import copy_tree
+
 logging.basicConfig(format='%(asctime)s - %(message)s', level=logging.INFO)
 
 
@@ -194,6 +196,32 @@ def move_files_to_other_labelled_folder(source_path, destination_path, image_dat
     return
 
 
+
+def move_files_startwith_folder_name(source_path, destination_path):
+    """
+    This function copy files from one to another
+    :param source_path: Directory containing images without labelled folders
+    :param destination_path: Destination with labelled subdirectories
+    :return:
+    """
+    dir_root = os.getcwd()
+    source_filepath = dir_root + os.sep + source_path
+
+    destination_filepath = dir_root + os.sep + destination_path
+
+    logging.debug(source_filepath)
+    logging.debug(destination_filepath)
+    try:
+        for root, dirs, files in os.walk(source_filepath):  # replace the . with your starting directory
+            for file in files:
+                path_file = os.path.join(root, file)
+                shutil.copy2(path_file, destination_filepath)
+    except Exception as e:
+        logging.error(f'{sys.exc_info()[0]} occurred: {source_filepath}', exc_info=True)
+
+    return
+
+
 def save_dataframe_to_csv(dataframe, file_path):
     dir_root = os.getcwd()
     dataframe.to_csv(dir_root + os.sep + file_path, sep='\t')
@@ -208,17 +236,24 @@ def main():
     split_data_path = dataset_path + os.sep + 'split'
     train_preprocessed_data_path = dataset_path + os.sep + 'train_preprocessed'
     test_preprocessed_data_path = dataset_path + os.sep + 'test_preprocessed'
+    final_dataset = dataset_path + os.sep + 'final_data'
 
     image_dataframe, grouped_image_dataframe, labels_dict = convert_annotation_json_to_dataframe(anns_file_path)
     # Optional step to save data to csv file
-    save_dataframe_to_csv(image_dataframe, 'data/filtered_image_data.csv')
-    save_dataframe_to_csv(grouped_image_dataframe, 'data/grouped_image_data.csv')
-    create_folder(train_preprocessed_data_path)
-    create_folder(test_preprocessed_data_path)
-    #create_split_folder(split_data_path, labels_dict.values())
-    move_files_to_other_labelled_folder(train_images_path, train_preprocessed_data_path, image_dataframe, False)
-    move_files_to_other_labelled_folder(test_images_path, test_preprocessed_data_path, image_dataframe, False)
+    #save_dataframe_to_csv(image_dataframe, 'data/filtered_image_data.csv')
+    #save_dataframe_to_csv(grouped_image_dataframe, 'data/grouped_image_data.csv')
 
+    #create_folder(train_preprocessed_data_path)
+    #create_folder(test_preprocessed_data_path)
+
+    create_split_folder(split_data_path, labels_dict.values())
+
+    #move_files_to_other_labelled_folder(train_images_path, split_data_path, image_dataframe, True)
+    #move_files_to_other_labelled_folder(test_images_path, test_preprocessed_data_path, image_dataframe, False)
+
+    #destination_folder = final_dataset+'/Paper'
+    #start_with_source_folder=split_data_path+'/5-Corrugated carton'
+    #move_files_startwith_folder_name(start_with_source_folder, destination_folder)
     return
 
 
